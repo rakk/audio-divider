@@ -1,12 +1,22 @@
 #!/bin/bash
 
+#
+# ------------------------------------------------------------
+# "THE BEERWARE LICENSE" (Revision 42):
+# <author> wrote this code. As long as you retain this
+# notice, you can do whatever you want with this stuff. If we
+# meet someday, and you think this stuff is worth it, you can
+# buy me a beer in return.
+# ------------------------------------------------------------
+#
+
 usage() {
-  echo "Usage: $0 [-f path-to-ffmpeg]" 1>&2;
+  echo "Usage: $0 [-f path-to-ffmpeg-directory]" 1>&2;
   echo "    [-i <image-location>] [-d <duration-in-seconds>]" 1>&2;
-  echo "    [-g <genre-default-audiobook>] [-a <author>]"
+  echo "    [-g <genre-default-audiobook>] [-a <author>]" 1>&2;
   echo "    your-media-file " 1>&2;
   echo "" 1>&2;
-  echo "    eg. $0 -f /bin/ffmpeg -i screenshot.png -d 30 my-movie.webm " 1>&2;
+  echo "    eg. $0 -f /bin -i screenshot.png -d 30 my-movie.webm " 1>&2;
   echo "" 1>&2;
   exit 1;
 }
@@ -35,7 +45,7 @@ getEndPosition() {
   echo "${end}"
 }
 
-ffmpegLocation="./ffmpeg"
+ffmpegLocation="./"
 image=""
 duration=$(( 2 * 60 ))
 genre="audiobook"
@@ -71,7 +81,7 @@ if [ -z "${filename}" ]; then
   usage
 fi
 
-lengthString=`./ffprobe -i "${filename}" -show_entries format=duration -v quiet -of csv="p=0" | sed `
+lengthString=`${ffmpegLocation}/ffprobe -i "${filename}" -show_entries format=duration -v quiet -of csv="p=0" | sed `
 length=${lengthString%.*}
 directoryName=${filename%.*}
 directoryUnifiedName=`echo "${directoryName}" | iconv -f utf-8 -t us-ascii//TRANSLIT | sed -e 's/[ ]/_/g'`
@@ -89,8 +99,7 @@ counter=$(( 000001 ))
 current=$(( 0 ))
 allParts=$(( ${length} / ${duration} + 1))
 
-# while [ ${current} -lt ${length} ]
-while [ ${current} -lt 1 ]
+while [ ${current} -lt ${length} ]
 do
   displayProgress ${current} ${duration} ${allParts}
 
@@ -104,26 +113,26 @@ do
   echo ""
 
   currentFullFilePath=${directoryUnifiedName}/${currentFile}.mp3
-  echo "${ffmpegLocation} -i \"${filename}\" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 \"${currentFullFilePath}\""
-  ${ffmpegLocation} -i "${filename}" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 "${currentFullFilePath}"
+  echo "${ffmpegLocation}/ffmpeg -i \"${filename}\" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 \"${currentFullFilePath}\""
+  ${ffmpegLocation}/ffmpeg -i "${filename}" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 "${currentFullFilePath}"
 
   tempFile=${directoryUnifiedName}/${currentFile}.tmp.mp3
 
   # update genre
   mv "${currentFullFilePath}" "${tempFile}"
   echo ""
-  echo "${ffmpegLocation} -i \"${tempFile}\" -metadata:s:v genre=\"${genre}\" ${authorPart} \"${currentFullFilePath}\""
+  echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -metadata:s:v genre=\"${genre}\" ${authorPart} \"${currentFullFilePath}\""
   echo ""
-  ${ffmpegLocation} -i "${tempFile}" -metadata genre="${genre}" "${currentFullFilePath}"
+  ${ffmpegLocation}/ffmpeg -i "${tempFile}" -metadata genre="${genre}" "${currentFullFilePath}"
   rm "${tempFile}"
 
   # udpate author
   if [ -n "${author}" ]; then
     mv "${currentFullFilePath}" "${tempFile}"
     echo ""
-    echo "${ffmpegLocation} -i \"${tempFile}\" -metadata author=\"${author}\" \"${currentFullFilePath}\""
+    echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -metadata author=\"${author}\" \"${currentFullFilePath}\""
     echo ""
-    ${ffmpegLocation} -i "${tempFile}" -metadata autho="${author}" "${currentFullFilePath}"
+    ${ffmpegLocation}/ffmpeg -i "${tempFile}" -metadata autho="${author}" "${currentFullFilePath}"
     rm "${tempFile}"
   fi
 
@@ -131,9 +140,9 @@ do
   if [ -n "${image}" ]; then
     mv "${currentFullFilePath}" "${tempFile}"
     echo ""
-    echo "${ffmpegLocation} -i \"${tempFile}\" -i \"${image}\" -map_metadata 0 -map 0 -map 1 \"${currentFullFilePath}\""
+    echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -i \"${image}\" -map_metadata 0 -map 0 -map 1 \"${currentFullFilePath}\""
     echo ""
-    ${ffmpegLocation} -i "${tempFile}" -i "${image}" -map_metadata 0 -map 0 -map 1 "${currentFullFilePath}"
+    ${ffmpegLocation}/ffmpeg -i "${tempFile}" -i "${image}" -map_metadata 0 -map 0 -map 1 "${currentFullFilePath}"
     rm "${tempFile}"
   fi
 

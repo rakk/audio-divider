@@ -7,3 +7,8 @@ ffserver
 *.gif
 *.mp4
 *.webm
+
+new/
+completed/
+
+*/
