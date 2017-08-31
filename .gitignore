@@ -1,0 +1,9 @@
+ffmpeg
+ffprobe
+ffserver
+
+*.jpg
+*.png
+*.gif
+*.mp4
+*.webm
