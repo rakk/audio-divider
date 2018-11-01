@@ -11,12 +11,16 @@
 #
 
 usage() {
-  echo "Usage: $0 [-f path-to-ffmpeg-directory]" 1>&2;
-  echo "    [-i <image-location>] [-d <duration-in-seconds>]" 1>&2;
-  echo "    [-g <genre-default-audiobook>] [-a <author>]" 1>&2;
+  echo "Usage: $0 \\" 1>&2;
+  echo "    [-i <image-location>] \\" 1>&2;
+  echo "    [-a <artist>] \\" 1>&2;
+  echo "    [-s <skip>] \\ # default 0" 1>&2;
+  echo "    [-d <duration-in-seconds>] \\ # default: 120s" 1>&2;
+  echo "    [-g <genre-default-audiobook>] \\ # default 'audiobook'" 1>&2;
+  echo "    [-f path-to-ffmpeg-directory] \\ # default './ffmpeg-bin/'" 1>&2;
   echo "    your-media-file " 1>&2;
   echo "" 1>&2;
-  echo "    eg. $0 -f /bin -i screenshot.png -d 30 my-movie.webm " 1>&2;
+  echo "    eg. $0 -f /bin -i screenshot.png -a \"Andrzej Wajda\" -d 30 my-movie.webm " 1>&2;
   echo "" 1>&2;
   exit 1;
 }
@@ -45,13 +49,14 @@ getEndPosition() {
   echo "${end}"
 }
 
-ffmpegLocation="./"
+ffmpegLocation="./ffmpeg-bin"
 image=""
 duration=$(( 2 * 60 ))
 genre="audiobook"
-author=""
+artist=""
+skip=$(( 0 ))
 
-while getopts ":f:i:d:g:a:" o; do
+while getopts ":f:i:d:g:a:s:" o; do
     case "${o}" in
         f)
             ffmpegLocation=${OPTARG}
@@ -66,7 +71,10 @@ while getopts ":f:i:d:g:a:" o; do
             genre=${OPTARG}
             ;;
         a)
-            author=${OPTARG}
+            artist=${OPTARG}
+            ;;
+        s)
+            skip=$(( ${OPTARG} ))
             ;;
         *)
             usage
@@ -91,12 +99,13 @@ echo "Filename: ${filename}"
 echo "Duration: ${duration}s"
 echo "Media length: ${length}"
 echo "Directory: ${directoryUnifiedName}"
+echo "Skip: ${skip}"
 echo ""
 
 mkdir -p "${directoryUnifiedName}"
 
-counter=$(( 000001 ))
-current=$(( 0 ))
+counter=$(( 000001 * ${skip} ))
+current=$(( ${duration} * ${skip} ))
 allParts=$(( ${length} / ${duration} + 1))
 
 while [ ${current} -lt ${length} ]
@@ -113,28 +122,13 @@ do
   echo ""
 
   currentFullFilePath=${directoryUnifiedName}/${currentFile}.mp3
-  echo "${ffmpegLocation}/ffmpeg -i \"${filename}\" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 \"${currentFullFilePath}\""
-  ${ffmpegLocation}/ffmpeg -i "${filename}" -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 "${currentFullFilePath}"
+
+  ${ffmpegLocation}/ffmpeg -i "${filename}" \
+      -metadata genre="${genre}" \
+      -metadata artist="${artist}" \
+      -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 "${currentFullFilePath}"
 
   tempFile=${directoryUnifiedName}/${currentFile}.tmp.mp3
-
-  # update genre
-  mv "${currentFullFilePath}" "${tempFile}"
-  echo ""
-  echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -metadata:s:v genre=\"${genre}\" ${authorPart} \"${currentFullFilePath}\""
-  echo ""
-  ${ffmpegLocation}/ffmpeg -i "${tempFile}" -metadata genre="${genre}" "${currentFullFilePath}"
-  rm "${tempFile}"
-
-  # udpate author
-  if [ -n "${author}" ]; then
-    mv "${currentFullFilePath}" "${tempFile}"
-    echo ""
-    echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -metadata author=\"${author}\" \"${currentFullFilePath}\""
-    echo ""
-    ${ffmpegLocation}/ffmpeg -i "${tempFile}" -metadata autho="${author}" "${currentFullFilePath}"
-    rm "${tempFile}"
-  fi
 
   # add image
   if [ -n "${image}" ]; then

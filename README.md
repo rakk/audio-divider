@@ -5,12 +5,12 @@
 I like listening in my car to audiobooks or podcasts. But navigating on huge and long audio file is frustrating.
 Especialy on mobile device when audiobook is 10 hours long...
 
-This script will solve your problem.
+If you have the same issue then this script will solve your problem.
 It allows you to split and convert you media into list of mp3 files.
 
 In other words, let say that you have some video file (Super-Cool.mp4)
 This scirpt will divide this file into mp3 files (001_Super-Cool, 002_Super-Cool, ...)
-Default duration of part is 120s. But you can change it using `-d` option (check Usage section).
+Default duration of single part is 120 seconds. But you can change it using `-d` option (check Usage section).
 
 ## Requirements
 
@@ -28,12 +28,16 @@ You have to have
 
 ## Usage
 ```
-Usage: audiobook-divider.sh [-f path-to-ffmpeg-directory]
-    [-i <image-location>] [-d <duration-in-seconds>]
-    [-g <genre-default-audiobook>] [-a <author>]"
+Usage: audiobook-divider.sh \
+    [-i <image-location>] \
+    [-a <author>] \
+    [-d <duration-in-seconds>] \        # default: 120 (seconds)
+    [-g <genre-default-audiobook>] \    # default: audiobook
+    [-f <path-to-ffmpeg-directory>] \   # default: ./ffmpeg-bin/
+    [-s <skip-first-n-item>] \          # default: 0
     your-media-file
 
-    eg. $0 -f /bin -i screenshot.png -d 30 my-movie.webm
+    eg. $0 -f /bin -i screenshot.png -d 30 -a "Andrzej Wajda" my-movie.webm
 ```
 
 ## Testing
