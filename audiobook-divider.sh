@@ -14,10 +14,11 @@ usage() {
   echo "Usage: $0 \\" 1>&2;
   echo "    [-i <image-location>] \\" 1>&2;
   echo "    [-a <artist>] \\" 1>&2;
-  echo "    [-s <skip>] \\ # default 0" 1>&2;
-  echo "    [-d <duration-in-seconds>] \\ # default: 120s" 1>&2;
-  echo "    [-g <genre-default-audiobook>] \\ # default 'audiobook'" 1>&2;
-  echo "    [-f path-to-ffmpeg-directory] \\ # default './ffmpeg-bin/'" 1>&2;
+  echo "    [-s <skip>] \\                       # default 0" 1>&2;
+  echo "    [-d <duration-in-seconds>] \\        # default: 120s" 1>&2;
+  echo "    [-g <genre-default-audiobook>] \\    # default 'audiobook'" 1>&2;
+  echo "    [-p <package-size>] \\               # default 50" 1>&2;
+  echo "    [-f path-to-ffmpeg-directory] \\     # default './ffmpeg-bin/'" 1>&2;
   echo "    your-media-file " 1>&2;
   echo "" 1>&2;
   echo "    eg. $0 -f /bin -i screenshot.png -a \"Andrzej Wajda\" -d 30 my-movie.webm " 1>&2;
@@ -49,12 +50,24 @@ getEndPosition() {
   echo "${end}"
 }
 
+processToMp3() {
+  echo "Converting file: '${1}' to mp3..."
+  echo "${ffmpegLocation}/ffmpeg -i \"${1}\" -metadata genre=\"${3}\" -metadata artist=\"${4}\" -acodec libmp3lame -aq 4 \"${2}\""
+  ${ffmpegLocation}/ffmpeg -i "${1}" \
+      -metadata genre="${3}" \
+      -metadata artist="${4}" \
+      -acodec libmp3lame -aq 4 "${2}"
+  echo ""
+  echo ""
+}
+
 ffmpegLocation="./ffmpeg-bin"
 image=""
 duration=$(( 2 * 60 ))
 genre="audiobook"
 artist=""
 skip=$(( 0 ))
+packageSize=$(( 50 ))
 
 while getopts ":f:i:d:g:a:s:" o; do
     case "${o}" in
@@ -76,6 +89,9 @@ while getopts ":f:i:d:g:a:s:" o; do
         s)
             skip=$(( ${OPTARG} ))
             ;;
+        p)
+            packageSize=$(( ${OPTARG} ))
+            ;;
         *)
             usage
             ;;
@@ -89,8 +105,6 @@ if [ -z "${filename}" ]; then
   usage
 fi
 
-lengthString=`${ffmpegLocation}/ffprobe -i "${filename}" -show_entries format=duration -v quiet -of csv="p=0" | sed `
-length=${lengthString%.*}
 directoryName=${filename%.*}
 directoryUnifiedName=`echo "${directoryName}" | iconv -f utf-8 -t us-ascii//TRANSLIT | sed -e 's/[ ]/_/g'`
 
@@ -102,18 +116,76 @@ echo "Directory: ${directoryUnifiedName}"
 echo "Skip: ${skip}"
 echo ""
 
+mp3FileName="${directoryUnifiedName}/temp_all.mp3"
+
+convertToMp3="true"
+if [ -f "${mp3FileName}" ]; then
+  read -r -p "Temp file ${mp3FileName} already exists. Override? [y/N]" response
+  case "$response" in
+    [yY])
+        convertToMp3="true"
+        ;;
+    [nN])
+        convertToMp3="false"
+        ;;
+    *)
+        echo "Invalid answer. Stop processing..."
+        exit 1
+        ;;
+   esac
+fi
+
+if [ "true" == "${convertToMp3}" ]; then
+  echo "Converting to mp3..."
+  processToMp3 "${filename}" "${mp3FileName}" "${artist}" "${genre}"
+else
+  echo "Skipping converting to mp3..."
+fi
+
+lengthString=`${ffmpegLocation}/ffprobe -i "${mp3FileName}" -show_entries format=duration -v quiet -of csv="p=0" | sed `
+length=${lengthString%.*}
+
+
+# add image
+#if [ -n "${image}" ]; then
+#  echo "Add image..."
+#  mv "${mp3FileName}" "${mp3FileName}.tmp"
+#  ${ffmpegLocation}/ffmpeg -i "${mp3FileName}.tmp" -i "${image}" -map_metadata 0 -map 0 -map 1 "${mp3FileName}"
+#  rm "${mp3FileName}.tmp"
+#fi
+
 mkdir -p "${directoryUnifiedName}"
 
-counter=$(( 000001 * ${skip} ))
+counter=$(( ( 000001 * ${skip} ) + 1 ))
 current=$(( ${duration} * ${skip} ))
-allParts=$(( ${length} / ${duration} + 1))
+allParts=$(( ${length} / ${duration} + 1 ))
+
+getCurrentFileName() {
+  local packageSize="${1}"
+  local dir="${2}"
+  local counter="${3}"
+  local length="${4}"
+  local unifiedCounter=`printf "%03d\n" ${counter}`
+  if [ ${packageSize} -lt 1 ] || [ ${packageSize} -lt ${length} ]; then
+    local package=$(( ${counter} / ${packageSize} ))
+    package=$(( ${package} + 1 ))
+    local unifiedPackage=`printf "%02d\n" ${package}`
+    if [ ! -f "${dir}/${dir}_${unifiedPackage}" ]; then
+      mkdir -p "${dir}/${dir}_${unifiedPackage}"
+    fi
+    currentFile="${dir}_${unifiedPackage}/${unifiedCounter}_${dir}"
+  else
+    currentFile="${unifiedCounter}_${dir}"
+  fi
+  
+  echo "${currentFile}"
+}
 
 while [ ${current} -lt ${length} ]
 do
   displayProgress ${current} ${duration} ${allParts}
 
-  unifiedCounter=`printf "%03d\n" $counter`
-  currentFile=${unifiedCounter}_${directoryUnifiedName}
+  currentFile=`getCurrentFileName ${packageSize} ${directoryUnifiedName} ${counter} ${allParts}`
 
   start=$(( ${current} ))
   end=`getEndPosition ${current} ${duration} ${length}`
@@ -123,19 +195,16 @@ do
 
   currentFullFilePath=${directoryUnifiedName}/${currentFile}.mp3
 
-  ${ffmpegLocation}/ffmpeg -i "${filename}" \
+  ${ffmpegLocation}/ffmpeg -i "${mp3FileName}" \
       -metadata genre="${genre}" \
       -metadata artist="${artist}" \
-      -ss ${start} -c copy -t ${duration} -acodec libmp3lame -aq 4 "${currentFullFilePath}"
-
+      -ss ${start} -t ${duration} -acodec copy "${currentFullFilePath}"
+  
   tempFile=${directoryUnifiedName}/${currentFile}.tmp.mp3
 
   # add image
   if [ -n "${image}" ]; then
     mv "${currentFullFilePath}" "${tempFile}"
-    echo ""
-    echo "${ffmpegLocation}/ffmpeg -i \"${tempFile}\" -i \"${image}\" -map_metadata 0 -map 0 -map 1 \"${currentFullFilePath}\""
-    echo ""
     ${ffmpegLocation}/ffmpeg -i "${tempFile}" -i "${image}" -map_metadata 0 -map 0 -map 1 "${currentFullFilePath}"
     rm "${tempFile}"
   fi
